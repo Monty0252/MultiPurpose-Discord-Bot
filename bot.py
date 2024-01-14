@@ -9,7 +9,7 @@ with open("config.json", "r") as config_file:
     config = json.load(config_file)
     bot_token = config["DISCORD_BOT_TOKEN"]
 
-bot = commands.Bot(command_prefix="/", intents=discord.Intents.all())
+bot = commands.Bot(command_prefix="!", intents=discord.Intents.all())
 bot_status = cycle(["Chilling", "Chilling More", "Chilling Expeditiously"])
 
 @tasks.loop(seconds=5)
