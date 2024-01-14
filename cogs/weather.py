@@ -1,4 +1,3 @@
-from dotenv import load_dotenv
 import os
 import discord
 import aiohttp
@@ -6,71 +5,25 @@ from discord.ext import commands
 import random
 import datetime
 import asyncio
+import json
 
-load_dotenv()
-def run_discord_bot():
-    bot = commands.Bot(command_prefix="-", intents=discord.Intents.all())
-   
-
-    @bot.event
-    async def on_ready():
-        print(f'{bot.user} is now running')
-
-    @bot.command(name='hi')  # This creates a command !hi
-    async def hi(ctx):
-        await ctx.send('Hello')
+# OpenWeatherMap API Key
+with open("config.json", "r") as config_file:
+    config = json.load(config_file)
+    OPEN_WEATHER_API_KEY = config["OPEN_WEATHER_API_KEY"]
     
-    @bot.command(name="deez")
-    async def deez(ctx):
-        await ctx.send('You dont got any fam :saluting_face:')
-    
-    @bot.command(name="changeName")
-    @commands.has_permissions(manage_nicknames=True)
-    async def changeName(ctx, member: discord.Member, nickname: str):
-        try:
-            await member.edit(nick=nickname)
-            await ctx.send(f"Changed {member}'s name to `{nickname}`!")
-        except discord.Forbidden:
-            await ctx.send("I do not have permission to change nicknames!")
-        except discord.HTTPException as e:
-            await ctx.send(f"Failed to change nickname. Error: {e}")
 
-    @bot.command(name="rollDeez")
-    async def roll(ctx):
-        result = random.randint(1, 100)
-        user = ctx.author.display_name
-        await ctx.send(f':game_die: {user} rolled {result} nutz!')
+class Weather(commands.Cog):
+    def __init__(self, client):
+        self.client = client
 
-    @bot.command(name='rollAll')
-    async def rollAll(ctx):
-        try:
-            # get online members
-            online_members = [member for member in ctx.guild.members if member.status == discord.Status.online and not member.bot]
-            result_messages = ""
-            highest_roll = 0
-            winner = None
-            
-            for member in online_members:
-                roll_result = random.randint(1, 100)
-                if roll_result > highest_roll:
-                    highest_roll = roll_result
-                    winner = member.display_name
-                result_messages += f":game_die: {member.display_name} rolled a {roll_result}\n"
-            
-            if not result_messages:
-                await ctx.send("No online members to roll for.")
-            else:
-                # Send the results message
-                await ctx.send(result_messages)
-                # Send the winner message with a space before it
-                if winner:
-                    await ctx.send(f"\n:crown: The winner is {winner} with a roll of {highest_roll}! :crown:")
-        except Exception as e:
+    @commands.Cog.listener()
+    async def on_ready(self):
+        print("Weather.py is ready!")
 
-            await ctx.send(f"An error occurred: {e}")
-   
-    @bot.command(name="weather")
-    async def weather(ctx):
+
+    @commands.command(name="weather")
+    async def weather(self, ctx):
         # Ask for the city
         await ctx.send("Please enter the city name:")
 
@@ -78,7 +31,7 @@ def run_discord_bot():
             return m.author == ctx.author and m.channel == ctx.channel
 
         try:
-            city_msg = await bot.wait_for('message', check=check_city, timeout=30.0)  # 30 seconds to reply
+            city_msg = await self.client.wait_for('message', check=check_city, timeout=30.0)  # 30 seconds to reply
         except asyncio.TimeoutError:
             await ctx.send("You did not reply in time!")
             return
@@ -92,15 +45,14 @@ def run_discord_bot():
             return m.author == ctx.author and m.channel == ctx.channel and (m.content.lower() in ['current', '5'])
 
         try:
-            forecast_msg = await bot.wait_for('message', check=check_forecast_type, timeout=30.0)
+            forecast_msg = await self.client.wait_for('message', check=check_forecast_type, timeout=30.0)
         except asyncio.TimeoutError:
             await ctx.send("You did not reply in time!")
             return
         else:
             forecast = forecast_msg.content.lower()
 
-        # OpenWeatherMap API Key
-        OPEN_WEATHER_API_KEY = os.getenv('OPEN_WEATHER_API_KEY')  # Make sure to set this environment variable
+        
 
         if forecast == "5":
             url = f"https://api.openweathermap.org/data/2.5/forecast?q={city}&appid={OPEN_WEATHER_API_KEY}&units=imperial"
@@ -180,8 +132,8 @@ def run_discord_bot():
                         await ctx.send(embed=embed)
                     else:
                         await ctx.send("Could not retrieve weather information.")
-    
 
-    DISCORD_BOT_TOKEN= os.getenv('TOKEN')
-    bot.run(DISCORD_BOT_TOKEN)
-run_discord_bot()
+
+
+async def setup(client):
+    await client.add_cog(Weather(client))
