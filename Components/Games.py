@@ -12,9 +12,9 @@ class CheapSharkCog(commands.Cog):
     def cog_unload(self):
         self.post_game_deals.cancel()
 
-    @tasks.loop(seconds=10)
+    @tasks.loop(seconds=100000)
     async def post_game_deals(self):
-        channel = discord.utils.get(self.bot.get_all_channels(), name='game-deals')
+        channel = discord.utils.get(self.bot.get_all_channels(), name='game-deal')
         if channel:
             game_deals = await self.fetch_game_deals()
             if game_deals:

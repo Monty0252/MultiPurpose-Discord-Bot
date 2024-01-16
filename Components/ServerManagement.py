@@ -82,6 +82,28 @@ class ServerManagementCog(commands.Cog):
         # Send the embed to the channel
         await ctx.send(embed=embed)
 
+    @commands.command()
+    @commands.is_owner()  # Ensure only the bot owner can use this command
+    async def leave(self, ctx, guild_id: int):
+        """Command for the bot to leave a server."""
+        if not isinstance(guild_id, int):
+            await ctx.send("Please provide a valid server ID.")
+            return
+
+        try:
+            guild = self.bot.get_guild(guild_id)
+            if guild:
+                await guild.leave()
+                await ctx.send(f"I have left {guild.name}.")
+            else:
+                await ctx.send("I am not in that server or invalid server ID.")
+        except discord.Forbidden:
+            await ctx.send("I don't have the permissions to leave this server.")
+        except discord.HTTPException as e:
+            await ctx.send(f"An HTTP error occurred: {e}")
+        except Exception as e:
+            await ctx.send(f"An unexpected error occurred: {e}")
+
 
 async def setup(bot):
     await bot.add_cog(ServerManagementCog(bot))

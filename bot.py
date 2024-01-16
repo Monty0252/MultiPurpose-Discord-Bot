@@ -23,9 +23,9 @@ async def on_ready():
     change_status.start()
 
 async def load():
-    for filename in os.listdir("./cogs"):
+    for filename in os.listdir("./Components"):
         if filename.endswith(".py"):
-            await bot.load_extension(f"cogs.{filename[:-3]}")
+            await bot.load_extension(f"Components.{filename[:-3]}")
             print(f"{filename[:-3]} is loaded!")
 
 

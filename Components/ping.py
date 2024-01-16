@@ -25,8 +25,6 @@ class Ping(commands.Cog):
 
         response = random.choice(responses).strip()
         await ctx.send(f"Question: {question}\nAnswer: {response}")
-
-
-
+    
 async def setup(client):
     await client.add_cog(Ping(client))
