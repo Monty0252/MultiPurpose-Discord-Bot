@@ -5,6 +5,13 @@ class ServerManagementCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
+    # Welcomes new user when they join the server
+    @commands.Cog.listener()
+    async def on_member_join(self, member):
+        welcome_channel = discord.utils.get(member.guild.channels, name='general')  # Replace 'general' with your channel name
+        if welcome_channel:
+            await welcome_channel.send(f"Hello {member.mention}, welcome to the server!")
+
     # Kick a user from the server
     @commands.command(name="kick")
     async def kick_member(self, ctx, member: discord.Member, *, reason="No reason provided"):
@@ -49,10 +56,18 @@ class ServerManagementCog(commands.Cog):
 
     # Change the nickname of a member
     @commands.command(name="nickname")
-    async def change_nickname(self, ctx, member: discord.Member, *, nickname):
+    async def change_nickname(self, ctx, member: discord.Member, *, nickname=None):
+        # Check if the user has the required permissions
         if ctx.author.guild_permissions.manage_nicknames:
+            # If the command includes 'reset' or no nickname, reset the member's nickname
+            if nickname == "reset" or nickname is None:
+                nickname = None  # This will reset the nickname
+                action = "reset"
+            else:
+                action = "changed to " + nickname
+
             await member.edit(nick=nickname)
-            await ctx.send(f"The nickname of {member.mention} has been changed to {nickname}.")
+            await ctx.send(f"The nickname of {member.mention} has been {action}.")
         else:
             await ctx.send("You do not have permission to manage nicknames.")
 
