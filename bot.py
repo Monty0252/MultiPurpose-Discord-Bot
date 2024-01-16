@@ -19,7 +19,7 @@ async def change_status():
 
 @bot.event
 async def on_ready():
-    print("Bot is connected to Discord Bitchesss")
+    print("Bot is connected to Discord")
     change_status.start()
 
 async def load():
