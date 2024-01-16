@@ -1,16 +1,22 @@
 import discord
 from discord.ext import commands
+from collections import defaultdict
+from datetime import datetime, timedelta
 
 class ServerManagementCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+        self.user_messages = defaultdict(lambda: [])
+        self.SPAM_MESSAGE_THRESHOLD = 5
+        self.SPAM_TIME_WINDOW = timedelta(seconds=30)
 
     # Welcomes new user when they join the server
     @commands.Cog.listener()
     async def on_member_join(self, member):
-        welcome_channel = discord.utils.get(member.guild.channels, name='general')  # Replace 'general' with your channel name
-        if welcome_channel:
-            await welcome_channel.send(f"Hello {member.mention}, welcome to the server!")
+        guild = member.guild
+        if guild.system_channel is not None:
+            await guild.system_channel.send(f'Hello {member.mention}, welcome to {guild.name}!')
+
 
     # Kick a user from the server
     @commands.command(name="kick")
@@ -44,6 +50,29 @@ class ServerManagementCog(commands.Cog):
             await ctx.send("User not found in the ban list.")
         else:
             await ctx.send("You do not have permission to unban members.")
+
+    # Spam Detection
+    @commands.Cog.listener()
+    async def on_message(self, message):
+        if message.author.bot:
+            return
+
+        messages = self.user_messages[message.author.id]
+        messages.append((message, datetime.now()))
+        messages = [msg for msg in messages if msg[1] > datetime.now() - self.SPAM_TIME_WINDOW]
+        self.user_messages[message.author.id] = messages
+
+        if len(messages) >= self.SPAM_MESSAGE_THRESHOLD:
+            await message.channel.send(f"{message.author.mention}, please stop spamming.")
+            try:
+                muted_role = discord.utils.get(message.guild.roles, name="Muted")
+                if muted_role:
+                    await message.author.add_roles(muted_role)
+                    await message.channel.send(f"{message.author.mention} has been muted for spamming.")
+                else:
+                    await message.channel.send("No 'Muted' role found.")
+            except discord.errors.Forbidden:
+                await message.channel.send("I don't have permission to mute members.")
 
     # Clear a specified number of messages in a channel
     @commands.command(name="clear")
