@@ -8,8 +8,9 @@ class ServerManagementCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.user_messages = defaultdict(lambda: [])
-        self.SPAM_MESSAGE_THRESHOLD = 5
+        self.SPAM_MESSAGE_THRESHOLD = 8
         self.SPAM_TIME_WINDOW = timedelta(seconds=30)
+        self.MUTE_DURATION = 60  # Mute duration in seconds
 
     # Welcomes new user when they join the server
     @commands.Cog.listener()
@@ -54,14 +55,19 @@ class ServerManagementCog(commands.Cog):
 
     
 
-    # Spam Detection
     @commands.Cog.listener()
     async def on_message(self, message):
         if message.author.bot:
             return
 
+        # Initialize message list if not already present
+        if message.author.id not in self.user_messages:
+            self.user_messages[message.author.id] = []
+
         messages = self.user_messages[message.author.id]
         messages.append((message, datetime.now()))
+
+        # Filter out messages outside the time window
         messages = [msg for msg in messages if msg[1] > datetime.now() - self.SPAM_TIME_WINDOW]
         self.user_messages[message.author.id] = messages
 
@@ -72,6 +78,13 @@ class ServerManagementCog(commands.Cog):
                 if muted_role:
                     await message.author.add_roles(muted_role)
                     await message.channel.send(f"{message.author.mention} has been muted for spamming.")
+
+                    # Schedule unmute after MUTE_DURATION
+                    await asyncio.sleep(self.MUTE_DURATION)
+                    await message.author.remove_roles(muted_role)
+                    await message.channel.send(f"{message.author.mention} has been unmuted.")
+                    # Remove user from the dictionary after unmuting
+                    del self.user_messages[message.author.id]
                 else:
                     await message.channel.send("No 'Muted' role found.")
             except discord.errors.Forbidden:
