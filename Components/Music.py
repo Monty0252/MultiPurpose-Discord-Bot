@@ -21,6 +21,7 @@ class music_cog(commands.Cog):
 
         # 2d array containing [song, channel]
         self.music_queue = []
+        self.played_music_queue = []
         self.ytdl_format_options = YTDL_Format_Options
         self.FFMPEG_OPTIONS = {'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5', 'options': '-vn'}
 
@@ -44,7 +45,7 @@ class music_cog(commands.Cog):
             m_url = self.music_queue[0][0]['source']
 
             #remove the first element as you are currently playing it
-            self.music_queue.pop(0)
+            self.played_music_queue.append(self.music_queue.pop(0))
             loop = asyncio.get_event_loop()
             data = await loop.run_in_executor(None, lambda: self.ytdl.extract_info(m_url, download=False))
             song = data['url']
@@ -69,7 +70,8 @@ class music_cog(commands.Cog):
             else:
                 await self.vc.move_to(self.music_queue[0][1])
             #remove the first element as you are currently playing it
-            self.music_queue.pop(0)
+            self.played_music_queue.append(self.music_queue.pop(0))
+            
             loop = asyncio.get_event_loop()
             data = await loop.run_in_executor(None, lambda: self.ytdl.extract_info(m_url, download=False))
             song = data['url']
@@ -124,7 +126,7 @@ class music_cog(commands.Cog):
         if self.vc != None and self.vc:
             self.vc.stop()
             #try to play next in the queue if it exists
-            await self.play_music(ctx)
+            await self.play_next(ctx)
 
 
     @commands.command(name="queue", aliases=["q"], help="Displays the current songs in queue")
@@ -132,6 +134,16 @@ class music_cog(commands.Cog):
         retval = ""
         for i in range(0, len(self.music_queue)):
             retval += f"#{i+1} -" + self.music_queue[i][0]['title'] + "\n"
+
+        if retval != "":
+            await ctx.send(f"```queue:\n{retval}```")
+        else:
+            await ctx.send("```No music in queue```")
+    @commands.command(name="pq", help="Displays the current songs in queue")
+    async def pq(self, ctx):
+        retval = ""
+        for i in range(0, len(self.played_music_queue)):
+            retval += f"#{i+1} -" + self.played_music_queue[i][0]['title'] + "\n"
 
         if retval != "":
             await ctx.send(f"```queue:\n{retval}```")
@@ -155,6 +167,8 @@ class music_cog(commands.Cog):
     async def re(self, ctx):
         self.music_queue.pop()
         await ctx.send("```last song removed```")
+
+    
 
 async def setup(client):
     await client.add_cog(music_cog(client))
