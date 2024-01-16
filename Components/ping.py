@@ -18,7 +18,7 @@ class Ping(commands.Cog):
         await ctx.send(f"Pong! {bot_latency} ms.")
 
     # Magic Eightball Command
-    @commands.command(aliases=['8ball', 'magic8ball'])
+    @commands.command(name='8ball')
     async def magic_eightball(self, ctx, *, question):
         with open("TextFiles\eightball_responses.txt", "r") as file:
             responses = file.readlines()

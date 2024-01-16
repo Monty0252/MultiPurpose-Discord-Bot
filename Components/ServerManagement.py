@@ -23,6 +23,7 @@ class ServerManagementCog(commands.Cog):
     # Kick a user from the server
     @commands.command(name="kick")
     async def kick_member(self, ctx, member: discord.Member, *, reason="No reason provided"):
+        """Command to kick member."""
         if ctx.author.guild_permissions.kick_members:
             await member.kick(reason=reason)
             await ctx.send(f"{member.mention} has been kicked for: {reason}")
@@ -32,6 +33,7 @@ class ServerManagementCog(commands.Cog):
     # Ban a user from the server
     @commands.command(name="ban")
     async def ban_member(self, ctx, member: discord.Member, *, reason="No reason provided"):
+        """Command to ban member."""
         if ctx.author.guild_permissions.ban_members:
             await member.ban(reason=reason)
             await ctx.send(f"{member.mention} has been banned for: {reason}")
@@ -41,6 +43,7 @@ class ServerManagementCog(commands.Cog):
     # Unban a user from the server
     @commands.command(name="unban")
     async def unban_member(self, ctx, *, member):
+        """Command to unban member."""
         if ctx.author.guild_permissions.ban_members:
             banned_users = await ctx.guild.bans()
             for entry in banned_users:
@@ -54,9 +57,9 @@ class ServerManagementCog(commands.Cog):
             await ctx.send("You do not have permission to unban members.")
 
     
-
+    # Spam detection
     @commands.Cog.listener()
-    async def on_message(self, message):
+    async def spam_detection(self, message):
         if message.author.bot:
             return
 
@@ -92,7 +95,12 @@ class ServerManagementCog(commands.Cog):
 
     # Clear a specified number of messages in a channel
     @commands.command(name="clear")
-    async def clear_messages(self, ctx, amount: int):
+    async def clear_messages(self, ctx, amount: int = None):
+        """Clear messages: !clear [number of messages]"""
+        if amount is None:
+            await ctx.send("Provide number of messages to delete")
+            return
+         
         if ctx.author.guild_permissions.manage_messages:
             await ctx.channel.purge(limit=amount + 1)
             await ctx.send(f"{amount} messages have been cleared by {ctx.author.mention}.")
@@ -102,6 +110,7 @@ class ServerManagementCog(commands.Cog):
     # Change the nickname of a member
     @commands.command(name="nickname")
     async def change_nickname(self, ctx, member: discord.Member, *, nickname=None):
+        """change nickname: !nickname @member "newnickname" """
         # Check if the user has the required permissions
         if ctx.author.guild_permissions.manage_nicknames:
             # If the command includes 'reset' or no nickname, reset the member's nickname
@@ -117,15 +126,22 @@ class ServerManagementCog(commands.Cog):
             await ctx.send("You do not have permission to manage nicknames.")
 
     # Server Stats
-    @commands.command(name="serverinfo")
+    @commands.command(name="info")
     async def display_server_info(self, ctx):
+        """Command to display server stats."""
         server = ctx.guild
-
         # Get server statistics
         member_count = len(server.members)
         text_channel_count = len(server.text_channels)
         voice_channel_count = len(server.voice_channels)
         server_owner = server.owner
+        member_count = len(server.members)
+        online_member_count = sum(1 for member in server.members if member.status != discord.Status.offline)
+        server_creation_date = server.created_at.strftime("%Y-%m-%d")
+        # server_region = server.region
+        server_roles = "\n".join(role.name for role in server.roles)
+        text_channels = "\n".join(text_channel.name for text_channel in server.text_channels)
+        voice_channels = "\n".join(voice_channel.name for voice_channel in server.voice_channels)
 
         # Create an embed to display server statistics
         embed = discord.Embed(
@@ -134,19 +150,25 @@ class ServerManagementCog(commands.Cog):
         )
 
         # Add server statistics to the embed
+        # embed.set_image(url=server.icon_url)
         embed.add_field(name="Total Members", value=member_count, inline=True)
+        embed.add_field(name="Online Members", value=online_member_count, inline=True)
         embed.add_field(name="Text Channels", value=text_channel_count, inline=True)
         embed.add_field(name="Voice Channels", value=voice_channel_count, inline=True)
         embed.add_field(name="Server Owner", value=server_owner, inline=True)
+        embed.add_field(name="Server Creation Date", value=server_creation_date, inline=True)
+        embed.add_field(name="Server Roles", value=server_roles, inline=True)
+        embed.add_field(name="Text Channels", value=text_channels, inline=True)
+        embed.add_field(name="Voice Channels", value=voice_channels, inline=True)
 
         # Send the embed to the channel
         await ctx.send(embed=embed)
 
     @commands.command()
     @commands.is_owner()  # Ensure only the bot owner can use this command
-    async def leave(self, ctx, guild_id: int):
+    async def leave(self, ctx, guild_id: int = None):
         """Command for the bot to leave a server."""
-        if not isinstance(guild_id, int):
+        if guild_id is None:
             await ctx.send("Please provide a valid server ID.")
             return
 
@@ -163,6 +185,9 @@ class ServerManagementCog(commands.Cog):
             await ctx.send(f"An HTTP error occurred: {e}")
         except Exception as e:
             await ctx.send(f"An unexpected error occurred: {e}")
+
+
+
 
 
 async def setup(bot):
