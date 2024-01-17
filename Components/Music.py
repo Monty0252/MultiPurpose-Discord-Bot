@@ -9,28 +9,6 @@ import asyncio
 YTDL_Format_Options = {'format': 'bestaudio/best', 'default_search': 'auto', 'quiet': 'True', 'no_warnings': 'True',
 'ignoreerrors': 'False', 'source_address': '0.0.0.0', 'nocheckcertificate': 'True', "noplaylist": 'True'}
 
-
-class MusicControls(View):
-    def __init__(self, bot):
-        super().__init__(timeout=None)
-        self.bot = bot
-
-    @discord.ui.button(label="Prev", style=discord.ButtonStyle.primary, custom_id="prev")
-    async def prev_button(self, button: Button, interaction: discord.Interaction):
-        ctx = await self.bot.get_context(interaction.message)
-        await self.bot.get_cog('music_cog').prev(ctx)
-
-    @discord.ui.button(label="Play/Pause", style=discord.ButtonStyle.success, custom_id="play_pause")
-    async def play_pause_button(self, button: Button, interaction: discord.Interaction):
-        ctx = await self.bot.get_context(interaction.message)
-        await self.bot.get_cog('music_cog').toggle_play_pause(ctx)
-
-    @discord.ui.button(label="Next", style=discord.ButtonStyle.danger, custom_id="next")
-    async def next_button(self, button: Button, interaction: discord.Interaction):
-        ctx = await self.bot.get_context(interaction.message)
-        await self.bot.get_cog('music_cog').next(ctx)
-
-
 class music_cog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -38,6 +16,7 @@ class music_cog(commands.Cog):
         #all the music related stuff
         self.is_playing = False
         self.is_paused = False
+        self.current_song_index = 0  # Initialize the current song index
 
         # 2d array containing [song, channel]
         self.music_queue = []
@@ -57,56 +36,46 @@ class music_cog(commands.Cog):
         search = VideosSearch(item, limit=1)
         return{'source':search.result()["result"][0]["link"], 'title':search.result()["result"][0]["title"]}
 
-    async def play_next(self):
+    async def play_next(self, current_song_index):
         if len(self.music_queue) > 0:
             self.is_playing = True
+            
+            #get the first url
+            self.current_song_index = (self.current_song_index + 1) % len(self.music_queue)
+            print("YOU PRESSED NEXT CURRENT INDEX")
+            print(self.current_song_index)
+            m_url = self.music_queue[self.current_song_index][0]['source']
 
-            # Get the first URL
-            m_url = self.music_queue[0][0]['source']
-            current_song = self.music_queue.pop(0)
-
+            #remove the first element as you are currently playing it
             loop = asyncio.get_event_loop()
             data = await loop.run_in_executor(None, lambda: self.ytdl.extract_info(m_url, download=False))
             song = data['url']
-
-            def after_playing(err):
-                if not err:
-                    self.played_music_queue.append(current_song)
-                asyncio.run_coroutine_threadsafe(self.play_next(), self.bot.loop)
-
-            self.vc.play(discord.FFmpegPCMAudio(song, executable="ffmpeg.exe", **self.FFMPEG_OPTIONS), after=after_playing)
+            self.vc.play(discord.FFmpegPCMAudio(song, executable= "ffmpeg.exe", **self.FFMPEG_OPTIONS), after=lambda e: asyncio.run_coroutine_threadsafe(self.play_next(), self.bot.loop))
         else:
             self.is_playing = False
 
-
-        # infinite loop checking 
+    # infinite loop checking 
     async def play_music(self, ctx):
         if len(self.music_queue) > 0:
             self.is_playing = True
 
-            m_url = self.music_queue[0][0]['source']
-            current_song = self.music_queue.pop(0)
+            m_url = self.music_queue[self.current_song_index][0]['source']
+            #try to connect to voice channel if you are not already connected
+            if self.vc == None or not self.vc.is_connected():
+                self.vc = await self.music_queue[0][1].connect()
 
-            # Try to connect to voice channel if not already connected
-            if self.vc is None or not self.vc.is_connected():
-                self.vc = await current_song[1].connect()
-
-                # In case we fail to connect
-                if self.vc is None:
-                    await ctx.send("Could not connect to the voice channel")
+                #in case we fail to connect
+                if self.vc == None:
+                    await ctx.send("```Could not connect to the voice channel```")
                     return
             else:
-                await self.vc.move_to(current_song[1])
-
+                await self.vc.move_to(self.music_queue[0][1])
+            #remove the first element as you are currently playing it
             loop = asyncio.get_event_loop()
             data = await loop.run_in_executor(None, lambda: self.ytdl.extract_info(m_url, download=False))
             song = data['url']
+            self.vc.play(discord.FFmpegPCMAudio(song, executable= "ffmpeg.exe", **self.FFMPEG_OPTIONS), after=lambda e: asyncio.run_coroutine_threadsafe(self.play_next(), self.bot.loop))
 
-            def after_playing(err):
-                self.played_music_queue.append(current_song)
-                asyncio.run_coroutine_threadsafe(self.play_next(), self.bot.loop)
-
-            self.vc.play(discord.FFmpegPCMAudio(song, executable="ffmpeg.exe", **self.FFMPEG_OPTIONS), after=after_playing)
         else:
             self.is_playing = False
 
@@ -159,22 +128,20 @@ class music_cog(commands.Cog):
             #try to play next in the queue if it exists
             await self.play_next(ctx)
 
+    @commands.command(name="prev",aliases=["pre"], help="Plays the previous song in the queue")
+    async def prev(self, ctx):
+        if self.vc != None and self.vc:
+            self.vc.stop()
+
+            self.current_song_index = (self.current_song_index - 2) % len(self.music_queue)
+            await self.play_next(ctx)
+           
 
     @commands.command(name="queue", aliases=["q"], help="Displays the current songs in queue")
     async def queue(self, ctx):
         retval = ""
         for i in range(0, len(self.music_queue)):
             retval += f"#{i+1} -" + self.music_queue[i][0]['title'] + "\n"
-
-        if retval != "":
-            await ctx.send(f"```queue:\n{retval}```")
-        else:
-            await ctx.send("```No music in queue```")
-    @commands.command(name="pq", help="Displays the current songs in queue")
-    async def pq(self, ctx):
-        retval = ""
-        for i in range(0, len(self.played_music_queue)):
-            retval += f"#{i+1} -" + self.played_music_queue[i][0]['title'] + "\n"
 
         if retval != "":
             await ctx.send(f"```queue:\n{retval}```")
@@ -198,57 +165,7 @@ class music_cog(commands.Cog):
     async def re(self, ctx):
         self.music_queue.pop()
         await ctx.send("```last song removed```")
-    
-    @commands.command(name="prev",aliases=["pre"], help="Plays the previous song in the queue")
-    async def prev(self, ctx):
-        if len(self.played_music_queue) > 0:
-            last_song = self.played_music_queue.pop()
-            self.music_queue.insert(0, last_song)
-            await ctx.send(f"Playing previously played song: '{last_song[0]['title']}'")
-            if self.is_playing:
-                self.vc.stop()
-            await self.play_music(ctx)
-        else:
-            await ctx.send("```No previously played songs```")
-    
-    @commands.command(name="controls")
-    async def controls(self, ctx):
-        view = MusicControls(self.bot)
-        await ctx.send("Music Controls:", view=view)
-    
-    async def toggle_play_pause(self, ctx):
-        if self.is_playing:
-            self.is_playing = False
-            self.is_paused = True
-            self.vc.pause()
-            await ctx.send("Music paused.")
-        elif self.is_paused:
-            self.is_playing = True
-            self.is_paused = False
-            self.vc.resume()
-            await ctx.send("Music resumed.")
-        else:
-            await ctx.send("Nothting is currently playing.")
-
-        
-    async def next(self, ctx):
-        if self.vc and self.vc.is_playing():
-            self.vc.stop()
-            await ctx.send("Skipping to the next song.")
-        else:
-            await ctx.send("No song is currently playing.")
-    
-    async def prev(self, ctx):
-        if len(self.played_music_queue) > 0:
-            last_song = self.played_music_queue.pop()
-            self.music_queue.insert(0, last_song)
-            if self.vc and self.vc.is_playing():
-                self.vc.stop()  # This should trigger play_next
-            else:
-                await self.play_music(ctx)  # Call play_music if nothing is currently playing
-            await ctx.send(f"Playing previously played song: '{last_song[0]['title']}'")
-        else:
-            await ctx.send("No previously played songs in the queue.")
 
 async def setup(client):
     await client.add_cog(music_cog(client))
+    
