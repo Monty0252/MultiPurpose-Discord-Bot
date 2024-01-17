@@ -9,6 +9,7 @@ import asyncio
 YTDL_Format_Options = {'format': 'bestaudio/best', 'default_search': 'auto', 'quiet': 'True', 'no_warnings': 'True',
 'ignoreerrors': 'False', 'source_address': '0.0.0.0', 'nocheckcertificate': 'True', "noplaylist": 'True'}
 
+
 class music_cog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -36,7 +37,7 @@ class music_cog(commands.Cog):
         search = VideosSearch(item, limit=1)
         return{'source':search.result()["result"][0]["link"], 'title':search.result()["result"][0]["title"]}
 
-    async def play_next(self, current_song_index):
+    async def play_next(self, ctx):
         if len(self.music_queue) > 0:
             self.is_playing = True
             
@@ -45,6 +46,7 @@ class music_cog(commands.Cog):
             print("YOU PRESSED NEXT CURRENT INDEX")
             print(self.current_song_index)
             m_url = self.music_queue[self.current_song_index][0]['source']
+            await ctx.send(f"**Currently Playing: {self.music_queue[self.current_song_index][0]['title']}**")
 
             #remove the first element as you are currently playing it
             loop = asyncio.get_event_loop()
@@ -74,6 +76,7 @@ class music_cog(commands.Cog):
             loop = asyncio.get_event_loop()
             data = await loop.run_in_executor(None, lambda: self.ytdl.extract_info(m_url, download=False))
             song = data['url']
+            await ctx.send(f"**Currently Playing: {self.music_queue[self.current_song_index][0]['title']}**")
             self.vc.play(discord.FFmpegPCMAudio(song, executable= "ffmpeg.exe", **self.FFMPEG_OPTIONS), after=lambda e: asyncio.run_coroutine_threadsafe(self.play_next(), self.bot.loop))
 
         else:
@@ -154,6 +157,10 @@ class music_cog(commands.Cog):
             self.vc.stop()
         self.music_queue = []
         await ctx.send("```Music queue cleared```")
+
+    @commands.command(name="currentsong", help="Gets name of current song playing")
+    async def current_song(self,ctx):
+        await ctx.send(f"**Currently Playing: {self.music_queue[self.current_song_index][0]['title']}**")
 
     @commands.command(name="stop", aliases=["disconnect", "l", "d"], help="Kick the bot from VC")
     async def dc(self, ctx):
