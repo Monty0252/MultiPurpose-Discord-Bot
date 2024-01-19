@@ -13,13 +13,16 @@ class Apex(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @commands.command(name='apexstats')
-    async def apex_stats(self, ctx, player_name, platform):
-        auth_key = Apex_API_Key 
+    @commands.command(name='apex-stats', help= "Gets stats of specified player in Apex Legends")
+    async def apex_stats(self, ctx, player_name=None, platform=None):
+
+        if player_name is None or platform is None:
+            return await ctx.send("Please provide both a player name and a platform when using this command.\nUsage: !apex-stats <player_name> <platform>")
+     
         base_url = "https://api.mozambiquehe.re/bridge"
 
         # Construct the curl command
-        curl_command = f'curl "{base_url}?auth={auth_key}&player={player_name}&platform={platform}"'
+        curl_command = f'curl "{base_url}?auth={Apex_API_Key}&player={player_name}&platform={platform}"'
 
         # Execute the curl command
         try:
@@ -56,19 +59,15 @@ class Apex(commands.Cog):
         except json.JSONDecodeError as e:
             await ctx.send(f"Error parsing JSON data: {e}")
 
-    @commands.command(name="ApexStore")
+    @commands.command(name="apex-store", help="Displays the current items in the Apex shop")
     async def get_store_data(self, ctx):
-        auth_key = Apex_API_Key
+        
         base_url = "https://api.mozambiquehe.re/store"
 
-        curl_command = f'curl "{base_url}?auth={auth_key}"'
+        curl_command = f'curl "{base_url}?auth={Apex_API_Key}"'
 
         try:
-            result = subprocess.run(curl_command,
-                                    shell=True,
-                                    capture_output=True,
-                                    text=True,
-                                    timeout=10)  # Adding a timeout to prevent hanging
+            result = subprocess.run(curl_command, shell=True, capture_output=True, text=True, check=True)
 
             if result.returncode == 0:
                 data = json.loads(result.stdout)
@@ -91,6 +90,67 @@ class Apex(commands.Cog):
 
                     # Send the embed
                     await ctx.send(embed=embed)
+            else:
+                await ctx.send("Error in executing curl command:" + result.stderr)
+        except Exception as e:
+            await ctx.send(f"An error occurred: {str(e)}")
+
+
+    @commands.command(name="apex-map", help="Displays the map rotation for Apex Legends battle royal")
+    async def map_rotation(self, ctx):
+        
+        base_url = "https://api.mozambiquehe.re/maprotation"
+
+        curl_command = f'curl "{base_url}?auth={Apex_API_Key}"'
+
+        try:
+            result = subprocess.run(curl_command, shell=True, capture_output=True, text=True, check=True)
+
+            if result.returncode == 0:
+                data = json.loads(result.stdout)
+
+                # Create and send embed for current map
+                current_data = data["current"]
+                
+                current_start_time = current_data["start"]
+                current_start_time= datetime.utcfromtimestamp(current_start_time).strftime("%b %d, %Y")
+                current_end_time = current_data["end"]
+                current_end_time = datetime.utcfromtimestamp(current_end_time).strftime("%b %d, %Y")
+
+    
+                current_embed = discord.Embed(
+                    title=f"**Current Map: ** {current_data['map']}",
+                    description=f"**Start Date:** {current_start_time}\n"
+                                f"**End Date:** {current_end_time}\n"
+                                f"**Code:** {current_data['code']}\n"
+                                f"**Duration (Minutes):** {current_data['DurationInMinutes']}\n"
+                                f"**Remaining Time (Minutes):** {current_data['remainingMins']}\n"
+                                f"**Remaining Timer:** {current_data['remainingTimer']}",
+                    color=discord.Color.blue()
+                )
+
+                # Create and send embed for next map
+                next_data = data["next"]
+
+                next_start_time = next_data["start"]
+                next_start_time= datetime.utcfromtimestamp(next_start_time).strftime("%b %d, %Y")
+                next_end_time = next_data["end"]
+                next_end_time = datetime.utcfromtimestamp(next_end_time).strftime("%b %d, %Y")
+
+                next_embed = discord.Embed(
+                    title=f"**Next Map: ** {next_data['map']}",
+                    description=f"**Start Date:** {next_start_time}\n"
+                                f"**End Date:** {next_end_time}\n"
+                                f"**Code:** {next_data['code']}\n"
+                                f"**Duration (Minutes):** {next_data['DurationInMinutes']}",
+                    color=discord.Color.green()
+                )
+
+                # Send the embeds
+                await ctx.send(embed=current_embed)
+                await ctx.send(embed=next_embed)
+
+                
             else:
                 await ctx.send("Error in executing curl command:" + result.stderr)
         except Exception as e:
