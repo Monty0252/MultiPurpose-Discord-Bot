@@ -147,7 +147,7 @@ class music_cog(commands.Cog):
             retval += f"#{i+1} -" + self.music_queue[i][0]['title'] + "\n"
 
         if retval != "":
-            await ctx.send(f"```queue:\n{retval}```")
+            await ctx.send(f"```Playlist:\n{retval}```")
         else:
             await ctx.send("```No music in queue```")
 
